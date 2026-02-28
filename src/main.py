@@ -14,7 +14,7 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         # Memuat modul instagram.py
-        await self.load_extension("src.instagram")
+        await self.load_extension("instagram")
         print("✅ Extension Instagram berhasil dimuat!")
 
     async def on_ready(self):
@@ -28,3 +28,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
