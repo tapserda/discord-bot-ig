@@ -5,9 +5,10 @@ import aiohttp
 import yaml
 import os
 
-# --- 1. LOAD CONFIGURATION ---
-with open("config.yaml", "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
+# Langsung ambil dari 'Variables' di dashboard Railway/Server kamu
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+GUILD_ID = os.environ.get("GUILD_ID")
+IG_USERNAME = os.environ.get("IG_USERNAME")
 
 # --- 2. INSTAGRAM COG CLASS ---
 class Instagram(commands.Cog):
@@ -125,3 +126,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot dimatikan.")
+
