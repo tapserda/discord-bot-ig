@@ -2,22 +2,22 @@ import asyncio
 import discord
 from discord.ext import commands, tasks
 import aiohttp
-import yaml
 import os
 
-# Langsung ambil dari 'Variables' di dashboard Railway/Server kamu
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-GUILD_ID = os.environ.get("GUILD_ID")
+# --- 1. AMBIL DATA DARI RAILWAY VARIABLES ---
+# Nama variabel di bawah ini harus persis dengan yang ada di image_8b7cab.png
+TOKEN = os.environ.get("DISCORD_TOKEN")
+GUILD_ID = os.environ.get("DISCORD_GUILD_ID")
+CHANNEL_NAME = os.environ.get("DISCORD_CHANNEL_NAME")
 IG_USERNAME = os.environ.get("IG_USERNAME")
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 
 # --- 2. INSTAGRAM COG CLASS ---
 class Instagram(commands.Cog):
-    def __init__(self, bot, config):
+    def __init__(self, bot):
         self.bot = bot
-        self.config = config
-        # API Key dari RapidAPI kamu
-        self.api_key = "717715efd1mshccccabe747e34e3p1dd701jsn638bbcfd2619" 
-        self.username = config["INSTAGRAM"]["USERNAME"]
+        self.api_key = RAPIDAPI_KEY 
+        self.username = IG_USERNAME
         self.last_post_id = None
         self.instagram_task.start()
 
@@ -43,17 +43,14 @@ class Instagram(commands.Cog):
                         
                         if edges:
                             node = edges[0].get("node", {})
-                            
-                            # Ambil Caption
                             cap_data = node.get("caption", {})
                             text = cap_data.get("text", "No caption provided.")
                             
-                            # Ambil Foto
                             img_url = node.get("display_url")
                             if not img_url:
-                                versions = node.get("image_versions2", {}).get("candidates", [])
-                                if versions:
-                                    img_url = versions[0].get("url")
+                                candidates = node.get("image_versions2", {}).get("candidates", [])
+                                if candidates:
+                                    img_url = candidates[0].get("url")
 
                             return {
                                 "id": node.get("id"),
@@ -67,21 +64,20 @@ class Instagram(commands.Cog):
                 print(f"Error Request IG: {e}")
         return None
     
-    @tasks.loop(seconds=600)
+    @tasks.loop(minutes=10) # Sesuai permintaan kamu: Cek tiap 10 menit
     async def instagram_task(self):
         post_data = await self.get_latest_post()
         if post_data:
-            print(f"DEBUG: ID API: {post_data['id']} | Memori Bot: {self.last_post_id}")
+            # Log debug biar kamu bisa pantau di Railway Dashboard
+            print(f"DEBUG: ID API: {post_data['id']} | Last Sent ID: {self.last_post_id}")
             
             if self.last_post_id != post_data["id"]:
                 self.last_post_id = post_data["id"] 
                 
-                guild_id = int(self.config["DISCORD"]["GUILD_ID"])
-                channel_name = self.config["INSTAGRAM"]["CHANNEL"]
-                
-                guild = self.bot.get_guild(guild_id)
+                # Pastikan GUILD_ID dan CHANNEL_NAME sudah diisi di Railway
+                guild = self.bot.get_guild(int(GUILD_ID))
                 if guild:
-                    channel = discord.utils.get(guild.channels, name=channel_name)
+                    channel = discord.utils.get(guild.channels, name=CHANNEL_NAME)
                     if channel:
                         link = f"https://www.instagram.com/p/{post_data['shortcode']}/"
                         embed = discord.Embed(
@@ -117,13 +113,11 @@ async def on_ready():
 # --- 4. MAIN RUNNER ---
 async def main():
     async with bot:
-        # Tambahkan Cog secara manual di sini
-        await bot.add_cog(Instagram(bot, config))
-        await bot.start(config["DISCORD"]["TOKEN"])
+        await bot.add_cog(Instagram(bot))
+        await bot.start(TOKEN)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot dimatikan.")
-
