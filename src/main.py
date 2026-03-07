@@ -12,6 +12,7 @@ CHANNEL_NAME = os.environ.get("DISCORD_CHANNEL_NAME")
 IG_USERNAME = os.environ.get("IG_USERNAME")
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 
+# File untuk menyimpan "ingatan" bot agar tidak spam post lama setelah restart
 DATA_FILE = "seen_posts.json"
 
 # --- 2. PERSISTENCE LAYER ---
@@ -38,6 +39,7 @@ class Instagram(commands.Cog):
         self.api_key = RAPIDAPI_KEY 
         self.username = IG_USERNAME
         self.seen_post_ids = load_seen_posts()
+        # Jika file seen_posts.json kosong, berarti ini pertama kali bot jalan
         self.is_first_run = len(self.seen_post_ids) == 0
         self.instagram_task.start()
 
@@ -80,55 +82,59 @@ class Instagram(commands.Cog):
                             })
                         return posts
                     else:
-                        print(f"API Error: {response.status}")
+                        print(f"❌ API Error: {response.status}")
             except Exception as e:
-                print(f"Request Error: {e}")
+                print(f"❌ Request Error: {e}")
         return []
-    
-    @tasks.loop(minutes=10)
+
+    async def send_to_discord(self, post):
+        """Fungsi pembantu untuk mengirim embed ke Discord"""
+        guild = self.bot.get_guild(int(GUILD_ID))
+        if guild:
+            channel = discord.utils.get(guild.channels, name=CHANNEL_NAME)
+            if channel:
+                link = f"https://www.instagram.com/p/{post['shortcode']}/"
+                embed = discord.Embed(
+                    title=f"New Content from @{self.username}",
+                    description=post["caption"][:400] + "...",
+                    url=link,
+                    color=0xbc2a8d
+                )
+                if post["image"]:
+                    embed.set_image(url=post["image"])
+                embed.set_footer(text="Instagram Forwarder by SAIKO SOCIETY")
+                
+                await channel.send(embed=embed)
+                print(f"🚀 Berhasil kirim ke Discord: {post['shortcode']}")
+
+    @tasks.loop(minutes=10) # Pengecekan otomatis setiap 10 menit
     async def instagram_task(self):
         posts = await self.get_latest_posts()
         if not posts:
             return
 
-        # Jika baru pertama kali jalan, catat semua yang ada agar tidak spam
+        # LOGIKA FIRST RUN (SAAT BOT BARU MENYALA)
         if self.is_first_run:
+            print(f"🔄 Inisialisasi Database untuk @{self.username}...")
             for post in posts:
-                if post["id"]:
-                    self.seen_post_ids.add(post["id"])
+                self.seen_post_ids.add(post["id"])
             save_seen_posts(self.seen_post_ids)
             self.is_first_run = False
-            print(f"✅ Database diinisialisasi. Menunggu post baru dari @{self.username}...")
+            
+            # PAKSA KIRIM 1 POST TERBARU SEBAGAI TES KONEKSI
+            if posts:
+                print(f"🧪 Mengirim post terakhir sebagai tes koneksi...")
+                await self.send_to_discord(posts[0])
             return
 
-        # Cari postingan yang benar-benar baru
-        new_posts = []
-        for post in posts:
-            if post["id"] and post["id"] not in self.seen_post_ids:
-                new_posts.append(post)
+        # LOGIKA MENCARI POSTINGAN YANG BENAR-BENAR BARU
+        new_posts = [p for p in posts if p["id"] not in self.seen_post_ids]
 
-        # Kirim ke Discord (reversed agar urutan waktu benar)
+        # Kirim post baru (reversed agar urutan waktu di Discord benar)
         for post in reversed(new_posts):
             self.seen_post_ids.add(post["id"])
             save_seen_posts(self.seen_post_ids)
-            
-            guild = self.bot.get_guild(int(GUILD_ID))
-            if guild:
-                channel = discord.utils.get(guild.channels, name=CHANNEL_NAME)
-                if channel:
-                    link = f"https://www.instagram.com/p/{post['shortcode']}/"
-                    embed = discord.Embed(
-                        title=f"New Content from @{self.username}",
-                        description=post["caption"][:400] + "...",
-                        url=link,
-                        color=0xbc2a8d
-                    )
-                    if post["image"]:
-                        embed.set_image(url=post["image"])
-                    embed.set_footer(text="Instagram Forwarder by SAIKO SOCIETY")
-                    
-                    await channel.send(embed=embed)
-                    print(f"🚀 Sent to Discord: {post['shortcode']}")
+            await self.send_to_discord(post)
 
     @instagram_task.before_loop
     async def before_instagram_task(self):
@@ -142,6 +148,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"✅ Bot Online: {bot.user.name}")
+    print(f"🔗 Terhubung ke Guild ID: {GUILD_ID}")
 
 async def main():
     async with bot:
