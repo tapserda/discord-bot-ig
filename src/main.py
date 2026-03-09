@@ -105,7 +105,7 @@ class InstagramForwarder(commands.Cog):
                 await channel.send(embed=embed)
                 print(f"🚀 Forwarded: {post['shortcode']}")
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(minutes=60)
     async def instagram_task(self):
         """Looping otomatis untuk mengecek postingan setiap 10 menit."""
         print(f"🔍 Memeriksa Instagram @{self.username}...")
@@ -156,3 +156,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Bot dimatikan.")
                 
+
