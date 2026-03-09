@@ -49,8 +49,3 @@ Pastikan folder proyek kamu berisi minimal 3 file berikut:
 1.  `main.py` (Script bot yang sudah kita rapihkan).
 2.  `requirements.txt` (Daftar library yang dibutuhkan).
 3.  `Procfile` (Instruksi cara menjalankan script).
-
-Isi file `requirements.txt`:
-```text
-discord.py
-aiohttp
